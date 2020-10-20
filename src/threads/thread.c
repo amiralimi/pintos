@@ -743,7 +743,7 @@ void thread_sleep (int64_t ticks)
 void update_deadline_priority(void)
 {
     struct list_elem *e;
-    for (e = list_begin (&ready_list); e != list_end (&all_list);
+    for (e = list_begin (&ready_list); e != list_end (&ready_list);
          e = list_next (e))
     {
         struct thread *t = list_entry (e, struct thread, allelem);
