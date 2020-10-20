@@ -141,6 +141,8 @@ void should_yield_current_thread (void);
 /* Thread sleep method */
 void thread_sleep (int64_t ticks);
 
+void update_deadline_priority(void)
+
 /* Performs some operation on thread t, given auxiliary data AUX. */
 typedef void thread_action_func (struct thread *t, void *aux);
 void thread_foreach (thread_action_func *, void *);
