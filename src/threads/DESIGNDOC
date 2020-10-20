@@ -1,0 +1,223 @@
+			+-----------------------+
+                        |        CS 140      	|
+                        | PROJECT 1: THREADS 	|
+                        |   DESIGN DOCUMENT  	|
+                        +-----------------------+
+     
+---- GROUP ----
+Pramod Khare <khare.pr@husky.neu.edu>
+Shruthi Keerthi Balki <balki.s@husky.neu.edu>
+Sarang Hattikar <hattikar.s@husky.neu.edu>
+
+---- PRELIMINARIES ----
+We had referenced the following sites in solving the project 1
+- 	http://w3.cs.jmu.edu/kirkpams/450-f14/projects/scheduling_project.shtml
+- 	http://web.stanford.edu/class/cs140/projects/pintos/pintos_1.html
+
+                             ALARM CLOCK
+                             ===========
+							 
+---- DATA STRUCTURES ----
+>> A1: Copy here the declaration of each new or changed `struct' or
+>> `struct' member, global or static variable, `typedef', or
+>> enumeration.  Identify the purpose of each in 25 words or less.
+
+- The changes in data structures for goal 1 in each file is described as follows :
+1) Changes in thread.h-
+-   Modified the enum of thread_status by adding a new status of thread which is sleeping state.This state of the thread tells if if the thread is in sleeping state.
+		
+enum thread_status
+{
+	THREAD_RUNNING,     /* Running thread. */
+	THREAD_READY,       /* Not running but ready to run. */
+	THREAD_SLEEPING,   /* New state for sleeping threads */
+	THREAD_BLOCKED,     /* Waiting for an event to trigger. */
+	THREAD_DYING        /* About to be destroyed. */
+};
+
+-   Modified the structure of thread (struct thread) by adding the following variables:
+    1. wake_time variable of type int which specifies the time for the thread to be woken up from the sleeping state.    
+        
+struct thread {
+	----
+	int64_t wake_time;   
+	----
+};
+
+2) Modification in thread.c
+- 	Added a new global list variable which would be having the list of all the threads currently in sleeping state. 
+	static struct list sleeping_list;
+
+---- ALGORITHMS ----
+
+>> A2: Briefly describe what happens in a call to timer_sleep(),
+>> including the effects of the timer interrupt handler.
+
+- 	When timer_sleep() is called, the calling thread is checked if it is an idle thread, If it is not, the thread is pushed into the sleeping_list in a sorted order(The list is sorted based on wake_time) and its state is changed to THREAD_SLEEPING state.
+-	schedule() function is called - which iterates over sleeping_list and checks if any of the threads are ready to run(sleep time is finished) and moves them to ready_list from sleeping_list.
+- 	Main purpose of the schedule function is that it switches the current and next thread if both are not equal.
+- 	When a thread is moved from sleeping_list to ready_list it is moved in a sorted order(Sorting is based on thread’s priority).
+- 	All of the interrupts are disabled at the start of the thread_sleep function and enabled after schedule is called. 
+
+>> A3: What steps are taken to minimize the amount of time spent in
+>> the timer interrupt handler?
+
+- 	Whenever a thread is pushed into the sleeping_list, the list is sorted. Hence the list is always sorted according to the wake_time. 
+- 	At every interrupt in the interrupt handler, the thread which is at the beginning of the sleeping_list is taken avoiding the iteration over the entire list.
+- 	Thus this would reduce the time spent in the interrupt handler.
+
+---- SYNCHRONIZATION ----
+
+>> A4: How are race conditions avoided when multiple threads call
+>> timer_sleep() simultaneously?
+
+- 	At any point in time, only a single thread would be running in processor hence timer_sleep() would not be called by multiple threads simultaneously.
+- 	As interrupts are disabled no other thread can be scheduled at the same time until we enable the interrupts again, the interrupts are enabled after schedule is completed.
+
+>> A5: How are race conditions avoided when a timer interrupt occurs
+>> during a call to timer_sleep()?
+
+- 	In timer_sleep function all the interrupts are disabled immediately after the timer_sleep is called and they are enabled after the thread is scheduled.
+- 	Thus race conditions could be avoided.
+
+---- RATIONALE ----
+
+>> A6: Why did you choose this design?  In what ways is it superior to
+>> another design you considered?
+
+- 	The initial design was to keep the sleeping_list in an unsorted order as it would not require the list to be sorted every time a thread is added to it. 
+- 	The advantage of the above design is it would be easy to add/remove threads from the list. 
+- 	The disadvantage is that in the interrupt handler the list need to be iterated entirely which would result in more time. 
+-	In the current design, the sleeping_list is sorted every time a thread is added/removed.Since this would reduce the time in the interrupt handler, this design was considered superior and hence implemented.
+
+				     PRIORITY SCHEDULING
+ 	                             ===================
+
+---- DATA STRUCTURES ----
+
+>> B1: Copy here the declaration of each new or changed `struct' or
+>> `struct' member, global or static variable, `typedef', or
+>> enumeration.  Identify the purpose of each in 25 words or less.
+
+- The changes in data structures for goal 1 in each file is described as follows :
+1) Modifications in thread.h file : 
+- 	Modified the structure of thread (struct thread) by adding/modifying the following variables:
+
+	1. 	base_priority variable of type int which specifies the initial priority of the thread given to it during thread creation. This variable has been added to distinguish between the donated priority and the initial priority.
+	2. 	waiting_for_lock structure of type lock which specifies the lock the thread is waiting on. It is null if not waiting on any lock.
+	3. 	donors structure of type list which specifies the list of donors of the thread (i.e) the threads waiting on locks the thread has.
+	4. 	donation_elem structure of type list_elem : this is an element which is pushed into donors list.
+			
+struct thread {
+	--
+	int base_priority;
+	struct lock *waiting_for_lock;
+	struct list donors;
+	struct list_elem donation_elem;
+	----
+};
+
+>> B2: Explain the data structure used to track priority donation.
+>> Use ASCII art to diagram a nested donation.  (Alternately, submit a
+>> .png file.)
+
+- 	The data structure used in priority donation is a linked list i.e. donors list is used to track the donor threads waiting for a lock or multiple locks held by this thread.
+- 	So the priority donation occurs only when the thread waiting for the lock has higher priority than the lock holder.
+
+- 	In the below diagram H, M and L are threads and a, b, c, d, e, f are the locks.
+
+- 	Here H1 is waiting for lock ‘c’ which M1 holds and M1 is waiting for lock ‘a’ which L holds.
+- 	Hence the scenario is as  follows :
+	H1 and H2 are waiting for M1 for lock c, d respectively.
+	H3 and H4 are waiting for M2 for lock e, f respectively.
+	M1 and M2 are waiting for L for lock a, b respectively.
+
+	     c        a
+	H1 ----> M1 ----> L
+	     d        a
+	H2 ----> M1 ----> L
+	     e        b
+	H3 ---->M2 -----> L 
+	     f        b
+	H4 ---->M2 -----> L
+
+- 	Therefore the donor list of threads is as follows :
+	L ‘s donor list is { M1, M2 }
+	M1’s donor list is { H1, H2 }
+	M2’s donor list is { H3, H4}
+
+- 	The priority of L is max(M1, M2, H1, H2, H3, H4) due to priority donation chaining.
+- 	The priority of M1 is max(H1, H2)
+- 	The priority of M2 is max(H3, H4)
+
+---- ALGORITHMS ----
+
+>> B3: How do you ensure that the highest priority thread waiting for
+>> a lock, semaphore, or condition variable wakes up first?
+
+- 	After releasing the lock and up the semaphore value, the waiter's list is sorted based on the thread priority and thread with highest priority is unblocked and added into ready list.
+
+>> B4: Describe the sequence of events when a call to lock_acquire()
+>> causes a priority donation.  How is nested donation handled?
+
+- 	Suppose a low priority thread ‘A’  is holding lock ’ L’ and a high priority thread ‘B’ is looking for acquiring lock ‘L’. Thus ‘B’ gives call to lock_acquire(). 
+- 	As a first step in this process ‘B’ checks for the holder of lock ‘L’ and add itself to the donor’s list of locker i.e. in this case ‘A’. This initiates priority donation process.
+- 	B’ then makes the semaphore down and add itself to the waitlist of the semaphore and finally thread ‘B’ is blocked.
+- 	Priority donation chaining is handled till depth of 8, where higher priority thread waiting for the lock would donate his priority to the lock holder lower priority thread and the same continues till the depth of 8.
+
+>> B5: Describe the sequence of events when lock_release() is called
+>> on a lock that a higher-priority thread is waiting for.
+
+- 	When lock_release() is called, first remove/release all the threads which were waiting for the released lock from the donors list.
+- 	From the remaining donors list, update the current thread’s priority with the highest donated priority if its higher than its own base_priority.
+- 	Call up operation on the semaphore which will unblock the thread with highest priority from the semaphore waiters’ list.
+
+---- SYNCHRONIZATION ----
+
+>> B6: Describe a potential race in thread_set_priority() and explain
+>> how your implementation avoids it.  Can you use a lock to avoid
+>> this race?
+
+- 	In our implementation, the interrupts are disabled before setting the thread’s priority hence any other thread would not be able to call the thread_set_priority(). This would be avoiding any potential race conditions between multiple set priority calls.
+- 	Whenever we change the thread priority we also update the priority donation chaining, thus its not possible to avoid race conditions using locks.
+
+---- RATIONALE ----
+
+>> B7: Why did you choose this design?  In what ways is it superior to
+>> another design you considered?
+
+- 	The initial design had no priority donors list(which contains priority donations of the threads waiting for multiple locks acquired by this thread), After releasing one of the locks, we were not able to update donated priority  to the next highest donated priority from remaining donors list.
+- 	Hence the donors list was necessary. Therefore the design which had the donors list was preferred.
+- 	Implementation of max heap was also considered instead of linked list for maintaining the donors and sleeping list.
+
+                           SURVEY QUESTIONS
+                           ================
+
+Answering these questions is optional, but it will help us improve the
+course in future quarters.  Feel free to tell us anything you
+want--these questions are just to spur your thoughts.  You may also
+choose to respond anonymously in the course evaluations at the end of
+the quarter.
+
+>> In your opinion, was this assignment, or any one of the three problems
+>> in it, too easy or too hard?  Did it take too long or too little time?
+
+- 	The assignment  wasn’t that easy, the main concepts which included priority donation in multi-threaded scenario was the key to solve the problem
+- 	It took long to understand the concepts and debug the solution.
+
+>> Did you find that working on a particular part of the assignment gave
+>> you greater insight into some aspect of OS design?
+
+- 	Yes, working on priority scheduling part of the problem cleared many concepts of the pintos OS design.
+
+>> Is there some particular fact or hint we should give students in
+>> future quarters to help them solve the problems?  Conversely, did you
+>> find any of our guidance to be misleading?
+
+- 	The test cases gave us a clear understanding of the problem.
+- 	No, we did not find any of the guidance misleading.
+
+>> Do you have any suggestions for the TAs to more effectively assist
+>> students, either for future quarters or the remaining projects?
+
+>> Any other comments?
