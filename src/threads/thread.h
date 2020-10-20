@@ -108,6 +108,8 @@ struct thread
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
+
+    int64_t deadline;
   };
 
 /* If false (default), use round-robin scheduler.
@@ -123,6 +125,7 @@ void thread_print_stats (void);
 
 typedef void thread_func (void *aux);
 tid_t thread_create (const char *name, int priority, thread_func *, void *);
+tid_t thread_create_deadline (const char *name, int priority, thread_func *,int64_t deadline, void *);
 
 void thread_block (void);
 void thread_unblock (struct thread *);
