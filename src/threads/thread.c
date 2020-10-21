@@ -625,9 +625,9 @@ next_thread_to_run (void)
 			toRun = e;
 		}
 	}
-	list_remove(&ready_list, e);
-  e -> status = RUNNING;
-	return e;
+	list_remove(&ready_list, toRun);
+  toRun -> status = RUNNING;
+	return toRun;
 }
 
 /* Completes a thread switch by activating the new thread's page
@@ -775,13 +775,14 @@ void thread_sleep (int64_t ticks)
 void update_deadline_priority(void)
 {
     struct list_elem *e;
+    
     for (e = list_begin (&ready_list); e != list_end (&ready_list);
          e = list_next (e))
     {
         struct thread *t = list_entry (e, struct thread, allelem);
         if (t-> deadline != -1) {
             t->priority = 1 / (t->deadline - timer_ticks()) * PRI_MAX;
-            list_remove(e);
+            list_remove(&ready_list, e);
             if(t -> deadline < 0)
             {
               t -> status = THREAD_MISSED;
