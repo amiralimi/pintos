@@ -37,6 +37,8 @@ static struct list all_list;
 */
 static struct list sleeping_list;
 
+static struct list missed_list;
+
 /* Idle thread. */
 static struct thread *idle_thread;
 
@@ -229,10 +231,11 @@ thread_create (const char *name, int priority,
  */
 tid_t
 thread_create_deadline (const char *name, int priority,
-               thread_func *function, int64_t deadline, void *aux,)
+               thread_func *function, int64_t deadline, enum thread_priority_type pt, void *aux,)
 {
     tid_t tid = thread_create(name, priority, function, aux);
     set_deadline(tid, deadline);
+    set_priority_type(tid, pt);
     return tid;
 }
 
@@ -249,6 +252,21 @@ set_deadline(tid_t tid, int64_t deadline)
         struct thread *t = list_entry (e, struct thread, allelem);
         if (t-> tid == tid) {
             t->deadline = deadline;
+            break;
+        }
+    }
+}
+
+void
+set_priority_type(tid_t tid, enum thread_priority_type pt)
+{
+     struct list_elem *e;
+    for (e = list_begin (&all_list); e != list_end (&all_list);
+         e = list_next (e))
+    {
+        struct thread *t = list_entry (e, struct thread, allelem);
+        if (t-> tid == tid) {
+            t->priority_type = pt;
             break;
         }
     }
@@ -592,10 +610,24 @@ alloc_frame (struct thread *t, size_t size)
 static struct thread *
 next_thread_to_run (void)
 {
-  if (list_empty (&ready_list))
+ if (list_empty (&ready_list))
     return idle_thread;
   else
-    return list_entry (list_pop_front (&ready_list), struct thread, elem);
+  int max = PRI_MIN;
+  struct thread *e, *toRun;
+  toRun = NULL;
+	for (e = list_begin (&ready_list); e != list_end (&ready_list);
+         e = list_next (e))
+    {
+		if( e -> priority > max)
+		{
+			max = e -> priority;
+			toRun = e;
+		}
+	}
+	list_remove(&ready_list, e);
+  e -> status = RUNNING;
+	return e;
 }
 
 /* Completes a thread switch by activating the new thread's page
@@ -750,6 +782,11 @@ void update_deadline_priority(void)
         if (t-> deadline != -1) {
             t->priority = 1 / (t->deadline - timer_ticks()) * PRI_MAX;
             list_remove(e);
+            if(t -> deadline < 0)
+            {
+              t -> status = THREAD_MISSED;
+              list_insert(&missed_list, e);
+            }
             list_insert_ordered(
                 &ready_list,
                 &t->elem,

@@ -12,8 +12,15 @@ enum thread_status
     THREAD_READY,       /* Not running but ready to run. */
     THREAD_SLEEPING,   /* New state for sleeping threads */
     THREAD_BLOCKED,     /* Waiting for an event to trigger. */
-    THREAD_DYING        /* About to be destroyed. */
+    THREAD_DYING,        /* About to be destroyed. */
+    THREAD_MISSED       /*Thread missed its deadline  */
   };
+
+enum thread_priority_type
+{
+   HARD,    
+   SOFT
+}
 
 /* Thread identifier type.
    You can redefine this to whatever type you like. */
@@ -89,6 +96,7 @@ struct thread
     char name[16];                      /* Name (for debugging purposes). */
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
+    enum THREAD_PRIORITY_TYPE priority_type;
     struct list_elem allelem;           /* List element for all threads list. */
     int64_t wake_time;                  /* Wake time for thread after sleeping */
 
@@ -125,7 +133,7 @@ void thread_print_stats (void);
 
 typedef void thread_func (void *aux);
 tid_t thread_create (const char *name, int priority, thread_func *, void *);
-tid_t thread_create_deadline (const char *name, int priority, thread_func *,int64_t deadline, void *);
+tid_t thread_create_deadline (const char *name, int priority, thread_func *,int64_t deadline,enum thread_priority_type pt, void *);
 
 void thread_block (void);
 void thread_unblock (struct thread *);
@@ -150,6 +158,8 @@ void thread_foreach (thread_action_func *, void *);
 int thread_get_priority (void);
 void thread_set_priority (int);
 void update_priority (void);
+
+void set_priority_type(tid_t tid, enum thread_priority_type pt);
 
 int thread_get_nice (void);
 void thread_set_nice (int);
