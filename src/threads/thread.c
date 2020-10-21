@@ -782,11 +782,11 @@ void update_deadline_priority(void)
         struct thread *t = list_entry (e, struct thread, allelem);
         if (t-> deadline != -1) {
             t->priority = 1 / (t->deadline - timer_ticks()) * PRI_MAX;
-            list_remove(&ready_list, e);
             if(t -> deadline < 0)
             {
               t -> status = THREAD_MISSED;
-              list_insert(&missed_list, e);
+              list_remove(&ready_list, t);
+              list_insert(&missed_list, t);
             }
             list_insert_ordered(
                 &ready_list,
