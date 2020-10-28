@@ -278,6 +278,7 @@ lock_release (struct lock *lock)
   // Update the priority and assign new donated priority from the donors
   // list if the base_priority is smaller
   update_priority();
+  update_deadline_priority();
   sema_up(&lock->semaphore);
   intr_set_level(old_level);
 }
