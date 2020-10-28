@@ -761,21 +761,24 @@ void thread_sleep(int64_t ticks)
 */
 void update_deadline_priority(void)
 {
-	struct list_elem *e;
+	struct list_elem *e = list_begin(&ready_list);
 
-	for (e = list_begin(&ready_list); e != list_end(&ready_list);
-		 e = list_next(e))
+	while (e != list_end(&ready_list))
 	{
 		struct thread *t = list_entry(e, struct thread, allelem);
 		if (t->deadline != -1)
 		{
-			t->priority = 1 / (t->deadline - timer_ticks()) * PRI_MAX;
-			if (t->deadline < 0)
+			e = list_next(e);
+
+			if (t->deadline <= timer_ticks())
 			{
 				t->status = THREAD_MISSED;
 				list_remove(t);
 				list_insert(&missed_list, t);
 			}
+			t->priority = 1 / (t->deadline - timer_ticks()) * PRI_MAX;
+			
+			list_remove(t);
 			list_insert_ordered(
 				&ready_list,
 				&t->elem,
@@ -872,6 +875,7 @@ void should_yield_current_thread(void)
  */
 void priority_donate_chain(void)
 {
+	update_deadline_priority();
 	struct thread *current_thread = thread_current();
 	struct lock *waiting_for_lock = current_thread->waiting_for_lock;
 	int depth;
