@@ -225,11 +225,11 @@ tid_t thread_create(const char *name, int priority,
  from before and just sets the deadline after.
  */
 tid_t thread_create_deadline(const char *name, int priority,
-							 thread_func *function, int64_t deadline, enum thread_priority_type pt, void *aux)
+							 thread_func *function, int64_t deadline,
+							 void *aux)
 {
 	tid_t tid = thread_create(name, priority, function, aux);
 	set_deadline(tid, deadline);
-	set_priority_type(tid, pt);
 	return tid;
 }
 
@@ -251,20 +251,6 @@ void set_deadline(tid_t tid, int64_t deadline)
 	}
 }
 
-void set_priority_type(tid_t tid, enum thread_priority_type pt)
-{
-	struct list_elem *e;
-	for (e = list_begin(&all_list); e != list_end(&all_list);
-		 e = list_next(e))
-	{
-		struct thread *t = list_entry(e, struct thread, allelem);
-		if (t->tid == tid)
-		{
-			t->priority_type = pt;
-			break;
-		}
-	}
-}
 
 /* Puts the current thread to sleep.  It will not be scheduled
    again until awoken by thread_unblock().
@@ -503,7 +489,7 @@ idle(void *idle_started_ UNUSED)
 
          See [IA32-v2a] "HLT", [IA32-v2b] "STI", and [IA32-v3a]
          7.11.1 "HLT Instruction". */
-		asm volatile("sti; hlt"
+		asm volatile("sti hlt"
 					 :
 					 :
 					 : "memory");
